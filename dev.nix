@@ -10,7 +10,8 @@
     pkgs.htop
     pkgs.playwright
     pkgs.python312Full
-    
+    pkgs.nodejs
+
     pkgs.chromium
     pkgs.chromedriver
 
