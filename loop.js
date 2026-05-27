@@ -17,7 +17,7 @@ const SLEEP_SESUDAH_AKSI = parseInt(process.env.SLEEP_SESUDAH_AKSI || '25',10);
 const SLEEP_JIKA_ERROR = parseInt(process.env.SLEEP_JIKA_ERROR || '2',10);
 const SLEEP_AFTER_FULL_ROUND = parseInt(process.env.SLEEP_AFTER_FULL_ROUND || '4',10);
 const MAX_PARALLEL = parseInt(process.env.MAX_PARALLEL || '25',10);
-const CLONES_PER_FILE = parseInt(process.env.CLONES_PER_FILE || '2',10);
+const CLONES_PER_FILE = parseInt(process.env.CLONES_PER_FILE || '1',10);
 const PROFILE_DIR = process.env.PROFILE_DIR || 'Default';
 const PAUSE_START = 3*60+25, PAUSE_END = 6*60+5;
 function nowWita(){ return new Date(Date.now() + 8*3600*1000); }
