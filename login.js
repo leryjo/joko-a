@@ -7,7 +7,6 @@ const SNAP_DIR = process.env.SNAP_DIR || path.join(BASE_DIR, 'snapshots');
 const LOGIN_MAX_MIN = (process.env.LOGIN_MAX_MIN || '').trim();
 const LOGIN_MAX_SEC = /^\d+$/.test(LOGIN_MAX_MIN) ? parseInt(LOGIN_MAX_MIN,10)*60 : null;
 const POLL_SEC = parseFloat(process.env.POLL_SEC || '2');
-const MAX_PARALLEL = 1;
 ensureDir(PROFILES_ROOT); ensureDir(SNAP_DIR); touch(EMAIL_FILE);
 
 function snapPath(idx, kind){ return path.join(SNAP_DIR, `acc${idx}_${kind}_${nowTag()}.png`); }
@@ -30,63 +29,61 @@ async function googleLoginFlow(driver, idx, email, pwd){ const waitMs=60000; awa
   const sp=snapPath(idx,'AFTER_PASSWORD'); await screenshot(driver, sp); await tgSendPhoto(`📸 <b>SETELAH SUBMIT PASSWORD</b>\nAkun: <code>${maskEmail(email)}</code>\nTime: <code>${nowTag()}</code>\nNote: Jika muncul OTP, akan dikirim notif terpisah.`, sp); return waitUntilDone(driver, idx, email); }
 async function runOne(idx, email, pwd){ const profileName=`joko${idx}`; const userDataDir=path.join(PROFILES_ROOT, profileName); let driver=null; console.log('='.repeat(70)); console.log(`[▶] AKUN #${idx} | ${email}`); console.log(`[i] profile folder: ${userDataDir}`); try{ driver=await buildDriver(userDataDir,'Default',['--window-size=800,800']); const ok=await googleLoginFlow(driver, idx, email, pwd); try{ await driver.quit(); }catch(e){} console.log(ok ? `[✅] DONE #${idx} (${profileName})` : `[⚠️] NOT OK #${idx} (${profileName})`); return ok; }catch(e){ console.error(`[❌] ERROR akun #${idx}:`, e); const sp=driver ? await screenshot(driver, snapPath(idx,'ERROR')) : ''; await tgSendPhoto(`❌ <b>ERROR FATAL</b>\nAkun: <code>${maskEmail(email)}</code>\nProfile: <code>${profileName}</code>\nErr: <code>${String(e).slice(0,240)}</code>\nTime: <code>${nowTag()}</code>`, sp); if(driver) try{ await driver.quit(); }catch(_){} return false; } }
 async function main(){
-  const accounts=readAccounts();
+  const accounts = readAccounts();
 
   if(!accounts.length){
     console.log(`[❌] Tidak ada akun valid di ${EMAIL_FILE}`);
-    console.log('Format: email|password');
+    console.log('Format: email@gmail.com|password');
     return;
   }
 
   writeMapping(accounts.length);
 
   await tgSendText(
-    `🚀 <b>LOGIN START</b>
-` +
-    `Total akun: <code>${accounts.length}</code>
-` +
-    `PROFILES_ROOT: <code>${PROFILES_ROOT}</code>
-` +
-    `HEADLESS: <code>${process.env.HEADLESS==='1'?1:0}</code>
-` +
-    `MODE: <code>SEQUENTIAL / SATU PER SATU</code>`
+    `🚀 <b>LOGIN START</b>\nMODE: <code>SEQUENTIAL 1 BY 1</code>\nTotal email: <code>${accounts.length}</code>\nCatatan: email berikutnya hanya jalan kalau email sebelumnya sukses.`
   );
 
-  let ok=0;
+  let ok = 0;
 
-  for(let i=0; i<accounts.length; i++){
+  for(let i = 0; i < accounts.length; i++){
     const acc = accounts[i];
-    const urutan = i + 1;
 
-    console.log('='.repeat(70));
-    console.log(`[QUEUE] Mulai login urutan #${urutan}/${accounts.length}: ${acc.email}`);
-    console.log(`[MODE] Satu Gmail dulu. Akun berikutnya menunggu sampai akun ini selesai.`);
+    console.log('\n===================================================');
+    console.log(`[START] LOGIN GMAIL KE-${i + 1}`);
+    console.log(`[EMAIL] ${acc.email}`);
+    console.log('===================================================\n');
 
-    await tgSendText(
-      `▶️ <b>LOGIN URUTAN ${urutan}/${accounts.length}</b>
-` +
-      `Akun: <code>${maskEmail(acc.email)}</code>
-` +
-      `Profile: <code>joko${urutan}</code>`
+    const result = await runOne(
+      i + 1,
+      acc.email,
+      acc.pwd
     );
 
-    const res = await runOne(urutan, acc.email, acc.pwd);
-    if(res) ok++;
+    if(result){
+      ok++;
 
-    console.log(`[QUEUE] Selesai urutan #${urutan}. Lanjut urutan berikutnya setelah delay 5 detik.`);
-    await sleep(5000);
+      console.log(`\n[DONE] SELESAI GMAIL KE-${i + 1}, LANJUT KE EMAIL BERIKUTNYA\n`);
+
+      await sleep(10000);
+    }else{
+      console.log(`\n[STOP] GMAIL KE-${i + 1} BELUM SUKSES. TIDAK LANJUT KE EMAIL BERIKUTNYA.\n`);
+
+      await tgSendText(
+        `🛑 <b>LOGIN STOP</b>\nGmail ke-${i + 1} belum sukses.\nEmail: <code>${maskEmail(acc.email)}</code>\nTidak lanjut ke email berikutnya.`
+      );
+
+      break;
+    }
   }
 
   await tgSendText(
-    `✅ <b>LOGIN FINISH</b>
-` +
-    `OK: <code>${ok}</code> / Total: <code>${accounts.length}</code>
-` +
-    `Mode: <code>SEQUENTIAL / SATU PER SATU</code>
-` +
-    `Semua akun sudah diproses sesuai urutan email.txt.`
+    `✅ <b>LOGIN FINISH</b>\nOK: <code>${ok}</code> / Total email: <code>${accounts.length}</code>\nMode: <code>SEQUENTIAL 1 BY 1</code>`
   );
 
-  console.log('[DONE] semua akun selesai diproses satu per satu sesuai urutan email.txt.');
+  console.log('[DONE] proses login selesai.');
 }
-main().catch(e=>{ console.error(e); process.exit(1); });
+
+main().catch(e=>{
+  console.error(e);
+  process.exit(1);
+});
